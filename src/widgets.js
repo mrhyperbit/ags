@@ -1,9 +1,6 @@
-import Gtk from 'gi://Gtk?version=3.0';
-import Gdk from 'gi://Gdk?version=3.0';
-import GLib from 'gi://GLib';
-import GdkPixbuf from 'gi://GdkPixbuf';
+import Gtk from 'gi://Gtk?version=4.0';
 import Widget from './widget.js';
-import { typecheck, error, runCmd, restcheck, warning, getConfig } from './utils.js';
+import { typecheck, runCmd, restcheck, warning } from './utils.js';
 
 function _orientation(str) {
     if (str === 'v')
@@ -37,101 +34,36 @@ export function Box({ type,
         homogeneous,
     });
 
-    children.forEach(w => box.add(Widget(w)));
+    children.forEach(w => box.append(Widget(w)));
 
     return box;
 }
 
-export function EventBox({ type,
-    onClick = '', onSecondaryClick = '', onMiddleClick = '',
-    onHover = '', onHoverLost = '',
-    onScrollUp = '', onScrollDown = '',
-    child, ...rest
+export function CenterBox({ type,
+    startWidget,
+    centerWidget,
+    endWidget,
+    ...rest
 }) {
-    typecheck('onClick', onClick, ['string', 'function'], type);
-    typecheck('onSecondaryClick', onSecondaryClick, ['string', 'function'], type);
-    typecheck('onMiddleClick', onMiddleClick, ['string', 'function'], type);
-    typecheck('onHover', onHover, ['string', 'function'], type);
-    typecheck('onHoverLost', onHoverLost, ['string', 'function'], type);
-    typecheck('onScrollUp', onScrollUp, ['string', 'function'], type);
-    typecheck('onScrollDown', onScrollDown, ['string', 'function'], type);
     restcheck(rest, type);
 
-    const box = new Gtk.EventBox();
-
-    box.connect('enter-notify-event', box => {
-        box.set_state_flags(Gtk.StateFlags.PRELIGHT, false);
-        runCmd(onHover, box);
+    const box = new Gtk.CenterBox({
+        start_widget: Widget(startWidget),
+        center_widget: Widget(centerWidget),
+        end_widget: Widget(endWidget),
     });
-
-    box.connect('leave-notify-event', box => {
-        box.unset_state_flags(Gtk.StateFlags.PRELIGHT);
-        runCmd(onHoverLost, box);
-    });
-
-    box.connect('button-press-event', (box, e) => {
-        box.set_state_flags(Gtk.StateFlags.ACTIVE, false);
-        switch (e.get_button()[1]) {
-        case 1: runCmd(onClick, box); break;
-        case 2: runCmd(onMiddleClick, box); break;
-        case 3: runCmd(onSecondaryClick, box); break;
-        default:
-            break;
-        }
-    });
-
-    box.connect('button-release-event', () =>
-        box.unset_state_flags(Gtk.StateFlags.ACTIVE));
-
-    if (onScrollUp || onScrollDown) {
-        box.add_events(Gdk.EventMask.SCROLL_MASK);
-        box.connect('scroll-event', (box, event) => {
-            if (event.get_scroll_direction()[1] === Gdk.ScrollDirection.UP)
-                runCmd(onScrollUp, box);
-            else if (event.get_scroll_direction()[1] === Gdk.ScrollDirection.DOWN)
-                runCmd(onScrollDown, box);
-        });
-    }
-
-    if (child)
-        box.add(Widget(child));
-
-    return box;
-}
-
-export function CenterBox({ type, children = [], ...props }) {
-    typecheck('children', children, 'array', type);
-
-    if (children.length !== 3)
-        error(`${type} should have exactly 3 children!`);
-
-    const box = Box({ type, ...props });
-
-    box.pack_start(Widget(children[0]), true, true, 0);
-    box.set_center_widget(Widget(children[1]));
-    box.pack_end(Widget(children[2]), true, true, 0);
 
     return box;
 }
 
 export function Icon({ type,
-    icon = '',
-    size = getConfig()?.baseIconSize || 16,
+    iconName = '',
     ...rest
 }) {
-    typecheck('icon', icon, 'string', type);
-    typecheck('icon', size, 'number', type);
+    typecheck('iconName', iconName, 'string', type);
     restcheck(rest, type);
 
-    return GLib.file_test(icon, GLib.FileTest.EXISTS)
-        ? Gtk.Image.new_from_pixbuf(
-            GdkPixbuf.Pixbuf.new_from_file_at_size(icon, size, size),
-        )
-        : new Gtk.Image({
-            icon_name: icon,
-            icon_size: 1,
-            pixel_size: size,
-        });
+    return Gtk.Image.new_from_icon_name(iconName);
 }
 
 export function Label({ type,
@@ -139,7 +71,6 @@ export function Label({ type,
     markup = false,
     wrap = false,
     maxWidth = -1,
-    angle = 0,
     justify = 'center',
     xalign = 0.5,
     yalign = 0.5,
@@ -148,23 +79,13 @@ export function Label({ type,
     typecheck('label', label, 'string', type);
     typecheck('markup', markup || false, 'boolean', type);
     typecheck('wrap', wrap || false, 'boolean', type);
-    typecheck('angle', angle || 0, 'number', type);
     typecheck('justify', justify || '', 'string', type);
     typecheck('xalign', xalign, 'number', type);
     typecheck('yalign', yalign, 'number', type);
     restcheck(rest, type);
 
-    let _justify;
-    try {
-        _justify = Gtk.Justification[justify.toUpperCase()];
-    } catch (error) {
-        warning('wrong justify value');
-    }
-
     const lbl = new Gtk.Label({
         label,
-        angle,
-        justify: _justify,
         use_markup: markup,
         max_width_chars: maxWidth,
         wrap,
@@ -172,43 +93,29 @@ export function Label({ type,
         yalign,
     });
 
+    try {
+        lbl.justify = Gtk.Justification[justify.toUpperCase()];
+    } catch (error) {
+        warning('wrong justify value');
+    }
+
     return lbl;
 }
 
 export function Button({ type,
     child,
     onClick = '',
-    onSecondaryClick = '',
-    onScrollUp = '',
-    onScrollDown = '',
     ...rest
 }) {
     typecheck('onClick', onClick, ['string', 'function'], type);
-    typecheck('onSecondaryClick', onSecondaryClick, ['string', 'function'], type);
-    typecheck('onScrollUp', onScrollUp, ['string', 'function'], type);
-    typecheck('onScrollDown', onScrollDown, ['string', 'function'], type);
     restcheck(rest, type);
 
     const btn = new Gtk.Button();
 
     if (child)
-        btn.add(Widget(child));
+        btn.set_child(Widget(child));
 
     btn.connect('clicked', () => runCmd(onClick, btn));
-    btn.connect('button-press-event', (_w, event) => {
-        if (event.get_button()[1] === Gdk.BUTTON_SECONDARY)
-            runCmd(onSecondaryClick, btn);
-    });
-
-    if (onScrollUp || onScrollDown) {
-        btn.add_events(Gdk.EventMask.SCROLL_MASK);
-        btn.connect('scroll-event', (_w, event) => {
-            if (event.get_scroll_direction()[1] === Gdk.ScrollDirection.UP)
-                runCmd(onScrollUp, btn);
-            else if (event.get_scroll_direction()[1] === Gdk.ScrollDirection.DOWN)
-                runCmd(onScrollDown, btn);
-        });
-    }
 
     return btn;
 }
@@ -232,30 +139,30 @@ export function Slider({ type,
     typecheck('drawValue', drawValue, 'boolean', type);
     restcheck(rest, type);
 
-    const slider = new Gtk.Scale({
-        orientation: _orientation(orientation),
-        adjustment: new Gtk.Adjustment({
-            value: min,
-            lower: min,
-            upper: max,
-            step_increment: (max - min) / 100,
+    const slider = Widget({
+        type: () => new Gtk.Scale({
+            orientation: _orientation(orientation),
+            adjustment: new Gtk.Adjustment({
+                value: min,
+                lower: min,
+                upper: max,
+                step_increment: (max - min) / 100,
+            }),
+            drawValue,
+            inverted,
         }),
-        draw_value: drawValue,
-        inverted: inverted,
-    });
+        onButtonPressed: slider => slider._dragging = true,
+        onButtonReleased: slider => slider._dragging = false,
+        onScroll: (slider, _dx, dy) => {
+            const { adjustment } = slider;
 
-    slider.connect('button-press-event', () => { slider._dragging = true; });
-    slider.connect('button-release-event', () => { slider._dragging = false; });
+            slider._dragging = true;
+            dy > 0
+                ? adjustment.value -= adjustment.step_increment
+                : adjustment.value += adjustment.step_increment;
 
-    slider.connect('scroll-event', ({ adjustment }, event) => {
-        const [, , y] = event.get_scroll_deltas();
-
-        slider._dragging = true;
-        y > 0
-            ? adjustment.value -= adjustment.step_increment
-            : adjustment.value += adjustment.step_increment;
-
-        slider._dragging = false;
+            slider._dragging = false;
+        },
     });
 
     if (onChange) {
@@ -272,69 +179,77 @@ export function Slider({ type,
     return slider;
 }
 
-export function Dynamic({ type, items = [], ...rest } = {}) {
+export function Stack({ type,
+    items = [],
+    hhomogeneous = true,
+    vhomogeneous = true,
+    interpolateSize = false,
+    transition = 'none',
+    transitionDuration = 200,
+    ...rest
+} = {}) {
+    typecheck('hhomogeneous', hhomogeneous, 'boolean', type);
+    typecheck('vhomogeneous', vhomogeneous, 'boolean', type);
+    typecheck('interpolateSize', interpolateSize, 'boolean', type);
+    typecheck('transition', transition, 'string', type);
+    typecheck('transitionDuration', transitionDuration, 'number', type);
     typecheck('items', items, 'array', type);
     restcheck(rest, type);
 
-    const children = items.map(({ value, widget }) => {
-        if (!widget)
-            return null;
+    const stack = new Gtk.Stack({
+        hhomogeneous,
+        vhomogeneous,
+        interpolateSize,
+        transitionDuration,
+    });
 
-        const w = Widget(widget);
-        w._value = value;
-        w.hide();
-        return w;
-    }).filter(item => item !== null);
+    try {
+        stack.transitionType = Gtk.StackTransitionType[transition.toUpperCase()];
+    } catch (error) {
+        error('wrong interpolate value');
+    }
 
-    const box = Box({ children });
-    box.update = condition => {
-        box.hide();
-        for (const item of children)
-            item.hide();
+    items.forEach(([name, widget]) => {
+        stack.add_named(Widget(widget), name);
+    });
 
-        for (const item of children) {
-            if (condition(item._value)) {
-                box.show();
-                item.show();
-                return;
-            }
-        }
+    stack.showChild = name => {
+        stack.set_visible_child_name(typeof name === 'function' ? name() : name);
     };
-
-    return box;
+    return stack;
 }
 
 export function Entry({ type,
     text = '',
-    placeholder = '',
+    placeholderText = '',
+    visibility = false,
     onChange = '',
     onAccept = '',
-    password = false,
     ...rest
 }) {
     typecheck('text', text, 'string', type);
-    typecheck('placeholder', placeholder, 'string', type);
+    typecheck('placeholderText', placeholderText, 'string', type);
     typecheck('onChange', onChange, ['string', 'function'], type);
     typecheck('onAccept', onAccept, ['string', 'function'], type);
-    typecheck('password', password, 'boolean', type);
+    typecheck('visibility', visibility, 'boolean', type);
     restcheck(rest, type);
 
     const entry = new Gtk.Entry({
-        placeholder_text: placeholder,
-        visibility: !password,
+        placeholderText,
+        visibility,
         text,
     });
 
     if (onAccept) {
-        entry.connect('activate', ({ text }) => {
+        entry.connect('activate', ({ buffer }) => {
             typeof onAccept === 'function'
-                ? onAccept(entry, text)
-                : runCmd(onAccept.replace(/\{\}/g, text));
+                ? onAccept(entry, buffer.text)
+                : runCmd(onAccept.replace(/\{\}/g, buffer.text));
         });
     }
 
     if (onChange) {
-        entry.connect('notify::text', ({ text }) => {
+        entry.buffer.connect('notify::text', ({ text }) => {
             typeof onAccept === 'function'
                 ? onChange(entry, text)
                 : runCmd(onChange.replace(/\{\}/g, text));
@@ -358,52 +273,61 @@ export function Scrollable({ type,
         hadjustment: new Gtk.Adjustment(),
         vadjustment: new Gtk.Adjustment(),
     });
-    scrollable.set_policy(
-        Gtk.PolicyType[hscroll.toUpperCase()],
-        Gtk.PolicyType[vscroll.toUpperCase()],
-    );
+
+    try {
+        scrollable.set_policy(
+            Gtk.PolicyType[hscroll.toUpperCase()],
+            Gtk.PolicyType[vscroll.toUpperCase()],
+        );
+    } catch (error) {
+        error('wrong scroll policy');
+    }
 
     if (child)
-        scrollable.add(Widget(child));
+        scrollable.set_child(Widget(child));
 
     return scrollable;
 }
 
 export function Revealer({ type,
     transition = 'crossfade',
-    duration = 250,
+    transitionDuration = 250,
     child,
     ...rest
 }) {
     typecheck('transition', transition, 'string', type);
-    typecheck('duration', duration, 'number', type);
+    typecheck('transitionDuration', transitionDuration, 'number', type);
     restcheck(rest, type);
 
-    let transitionType;
-    try {
-        transitionType = Gtk.RevealerTransitionType[transition.toUpperCase()];
-    } catch (error) {
-        logError(error);
-    }
-
     const revealer = new Gtk.Revealer({
-        transition_type: transitionType,
-        transition_duration: duration,
+        transitionDuration,
     });
 
+    try {
+        revealer.transitionType = Gtk.RevealerTransitionType[transition.toUpperCase()];
+    } catch (error) {
+        error('wrong transition type');
+    }
+
     if (child)
-        revealer.add(Widget(child));
+        revealer.set_child(Widget(child));
 
     return revealer;
 }
 
-export function Overlay({ type, children = [], passthrough = true, ...rest }) {
+export function Overlay({ type,
+    children = [],
+    passthrough = true,
+    ...rest
+}) {
+    typecheck('children', children, 'array', type);
+    typecheck('passthrough', passthrough, 'boolean', type);
     restcheck(rest, type);
 
     const overlay = new Gtk.Overlay();
 
     if (children[0]) {
-        overlay.add(Widget(children[0]));
+        overlay.set_child(Widget(children[0]));
         children.splice(1).forEach(ch => overlay.add_overlay(Widget(ch)));
     }
 
@@ -414,23 +338,22 @@ export function Overlay({ type, children = [], passthrough = true, ...rest }) {
 }
 
 export function ProgressBar({ type,
-    value = 0,
+    fraction = 0,
     inverted = false,
     orientation = 'horizontal',
     ...rest
 }) {
+    typecheck('fraction', fraction, 'number', type);
     typecheck('inverted', inverted, 'boolean', type);
     typecheck('orientation', orientation, 'string', type);
-    typecheck('value', value, 'number', type);
     restcheck(rest, type);
 
     const bar = new Gtk.ProgressBar({
         orientation: _orientation(orientation),
         inverted,
-        fraction: value,
+        fraction,
     });
 
-    bar.setValue = v => bar.set_fraction(v);
     return bar;
 }
 

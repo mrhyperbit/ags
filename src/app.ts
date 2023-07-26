@@ -1,5 +1,5 @@
-import Gtk from 'gi://Gtk?version=3.0';
-import Gdk from 'gi://Gdk?version=3.0';
+import Gtk from 'gi://Gtk?version=4.0';
+import Gdk from 'gi://Gdk?version=4.0';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
@@ -69,12 +69,12 @@ export default class App extends Gtk.Application {
         const cssProvider = new Gtk.CssProvider();
         cssProvider.load_from_path(path);
 
-        const screen = Gdk.Screen.get_default();
-        if (!screen)
+        const display = Gdk.Display.get_default();
+        if (!display)
             return;
 
-        Gtk.StyleContext.add_provider_for_screen(
-            screen,
+        Gtk.StyleContext.add_provider_for_display(
+            display,
             cssProvider,
             Gtk.STYLE_PROVIDER_PRIORITY_USER,
         );

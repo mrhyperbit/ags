@@ -1,4 +1,4 @@
-import Gtk from 'gi://Gtk?version=3.0';
+import Gtk from 'gi://Gtk?version=4.0';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
@@ -9,7 +9,6 @@ interface Config {
     windows?: Window[]
     style?: string
     stackTraceOnError?: boolean
-    baseIconSize?: number
     notificationPopupTimeout?: number
     exitOnError?: boolean
     closeWindowDelay: { [key: string]: number }
@@ -46,7 +45,7 @@ export function typecheck(key: string, value: unknown, type: string | string[], 
                 return true;
         }
 
-        warning(`"${key}" has to be one of ${type.join(' or ')} on ${widget}`);
+        warning(`"${key}" has to be one of [${type.join(', ')}] on ${widget}`);
         return false;
     }
 
@@ -121,7 +120,7 @@ export function connect(
     timeout(10, () => callback(widget));
 }
 
-export function interval(interval: number, callback: () => void, widget: Gtk.Widget) {
+export function interval(interval: number, callback: () => void, widget?: Gtk.Widget) {
     callback();
     const id = GLib.timeout_add(GLib.PRIORITY_DEFAULT, interval, () => {
         callback();
@@ -162,15 +161,12 @@ export function getConfig() {
     }
 }
 
-export function lookUpIcon(name?: string, size = 16) {
-    if (!name)
+export function lookUpIcon(name = '') {
+    try {
+        return Gio.Icon.new_for_string(name);
+    } catch (error) {
         return null;
-
-    return Gtk.IconTheme.get_default().lookup_icon(
-        name,
-        size,
-        Gtk.IconLookupFlags.USE_BUILTIN,
-    );
+    }
 }
 
 export const help = (bin: string) => `USAGE:
