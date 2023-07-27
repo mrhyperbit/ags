@@ -17,6 +17,7 @@ import './service/notifications.js';
 const APP_BUS = 'com.github.Aylur.' + pkg.name;
 const APP_PATH = '/com/github/Aylur/' + pkg.name;
 
+GLib.setenv('LD_PRELOAD', '', true);
 export function main(args: string[]) {
     switch (args[1]) {
     case 'version':

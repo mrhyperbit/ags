@@ -18,6 +18,14 @@ function _orientation(str) {
     return Gtk.Orientation.HORIZONTAL;
 }
 
+function removeBoxChildren(box) {
+    let child = box.get_first_child();
+    while (child) {
+        box.remove(child);
+        child = box.get_first_child();
+    }
+}
+
 export function Box({ type,
     orientation = 'horizontal',
     homogeneous = false,
@@ -35,6 +43,7 @@ export function Box({ type,
     });
 
     children.forEach(w => box.append(Widget(w)));
+    box.removeChildren = () => removeBoxChildren(box);
 
     return box;
 }
@@ -43,11 +52,13 @@ export function CenterBox({ type,
     startWidget,
     centerWidget,
     endWidget,
+    orientation = 'horizontal',
     ...rest
 }) {
     restcheck(rest, type);
 
     const box = new Gtk.CenterBox({
+        orientation: _orientation(orientation),
         start_widget: Widget(startWidget),
         center_widget: Widget(centerWidget),
         end_widget: Widget(endWidget),
@@ -58,8 +69,10 @@ export function CenterBox({ type,
 
 export function Icon({ type,
     iconName = '',
+    icon,
     ...rest
 }) {
+    iconName = icon ? icon : iconName;
     typecheck('iconName', iconName, 'string', type);
     restcheck(rest, type);
 
@@ -151,25 +164,16 @@ export function Slider({ type,
             drawValue,
             inverted,
         }),
-        onButtonPressed: slider => slider._dragging = true,
-        onButtonReleased: slider => slider._dragging = false,
         onScroll: (slider, _dx, dy) => {
             const { adjustment } = slider;
-
-            slider._dragging = true;
             dy > 0
                 ? adjustment.value -= adjustment.step_increment
                 : adjustment.value += adjustment.step_increment;
-
-            slider._dragging = false;
         },
     });
 
     if (onChange) {
         slider.adjustment.connect('notify::value', ({ value }) => {
-            if (!slider._dragging)
-                return;
-
             typeof onChange === 'function'
                 ? onChange(slider, value)
                 : runCmd(onChange.replace(/\{\}/g, value));
@@ -210,11 +214,16 @@ export function Stack({ type,
     }
 
     items.forEach(([name, widget]) => {
-        stack.add_named(Widget(widget), name);
+        if (widget)
+            stack.add_named(Widget(widget), name);
     });
 
     stack.showChild = name => {
-        stack.set_visible_child_name(typeof name === 'function' ? name() : name);
+        const n = typeof name === 'function' ? name() : name;
+        stack.visible = true;
+        stack.get_child_by_name(n)
+            ? stack.set_visible_child_name(n)
+            : stack.visible = false;
     };
     return stack;
 }
@@ -222,7 +231,7 @@ export function Stack({ type,
 export function Entry({ type,
     text = '',
     placeholderText = '',
-    visibility = false,
+    visibility = true,
     onChange = '',
     onAccept = '',
     ...rest
@@ -292,9 +301,11 @@ export function Scrollable({ type,
 export function Revealer({ type,
     transition = 'crossfade',
     transitionDuration = 250,
+    duration,
     child,
     ...rest
 }) {
+    transitionDuration = duration ? duration : transitionDuration;
     typecheck('transition', transition, 'string', type);
     typecheck('transitionDuration', transitionDuration, 'number', type);
     restcheck(rest, type);
@@ -316,23 +327,32 @@ export function Revealer({ type,
 }
 
 export function Overlay({ type,
-    children = [],
-    passthrough = true,
+    overlays = [],
+    child,
     ...rest
 }) {
-    typecheck('children', children, 'array', type);
-    typecheck('passthrough', passthrough, 'boolean', type);
+    typecheck('children', overlays, 'array', type);
     restcheck(rest, type);
 
     const overlay = new Gtk.Overlay();
 
-    if (children[0]) {
-        overlay.set_child(Widget(children[0]));
-        children.splice(1).forEach(ch => overlay.add_overlay(Widget(ch)));
-    }
+    if (child)
+        overlay.set_child(Widget(child));
 
-    if (passthrough)
-        overlay.get_children().forEach(ch => overlay.set_overlay_pass_through(ch, true));
+    overlays.forEach(w => {
+        const { measure, clip } = w;
+        delete w.measure;
+        delete w.clip;
+
+        const widget = Widget(w);
+        overlay.add_overlay(widget);
+
+        if (typeof clip === 'boolean')
+            overlay.set_clip_overlay(widget, clip);
+
+        if (typeof measure === 'boolean')
+            overlay.set_measure_overlay(widget, measure);
+    });
 
     return overlay;
 }

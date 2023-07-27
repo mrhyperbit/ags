@@ -1,14 +1,13 @@
 import Gtk from 'gi://Gtk?version=4.0';
 import Gdk from 'gi://Gdk?version=4.0';
-import { restcheck, typecheck, warning } from './utils.js';
 import Widget from './widget.js';
-import App from './app.js';
+import { restcheck, typecheck, warning } from './utils.js';
 import { setStyle, toggleClassName } from './widget.js';
 
 const { Gtk4LayerShell: GtkLayerShell } = imports.gi;
 
 export interface Window {
-    anchor?: string[]
+    anchor?: string
     child?: { type: string } | Gtk.Widget | null
     className?: string
     exclusive?: boolean
@@ -17,40 +16,40 @@ export interface Window {
     margin?: number[] | number
     monitor?: number
     name?: string
-    popup?: boolean
     style?: string
     visible?: boolean
     setup?: (win: Gtk.Window) => void,
+    modal?: boolean,
 }
 
 export default function Window({
     name = 'gtk-layer-shell',
-    anchor = [],
+    anchor = '',
     margin = [],
     layer = 'top',
     exclusive = false,
-    popup = false,
     focusable = false,
     child = null,
     className = '',
     style = '',
     monitor,
     visible = true,
+    modal = false,
     setup,
     ...rest
 }: Window): Gtk.Window {
     typecheck('name', name, 'string', 'window');
-    typecheck('anchor', anchor, 'array', 'window');
+    typecheck('anchor', anchor, 'string', 'window');
     typecheck('margin', margin, ['number', 'array'], 'window');
     typecheck('layer', layer, 'string', 'window');
     typecheck('exclusive', exclusive, 'boolean', 'window');
-    typecheck('popup', popup, 'boolean', 'window');
     typecheck('focusable', focusable, 'boolean', 'window');
     typecheck('className', className, 'string', 'window');
     typecheck('monitor', monitor, ['number', 'undefined'], 'window');
     restcheck(rest, `window: ${name}`);
 
     const win = new Gtk.Window({ name });
+    win.set_default_size(1, 1);
     GtkLayerShell.init_for_window(win);
     GtkLayerShell.set_namespace(win, name);
 
@@ -61,13 +60,17 @@ export default function Window({
     win.toggleClassName = (className: string, condition) => toggleClassName(win, className, condition);
 
     if (anchor) {
-        anchor.forEach(side => GtkLayerShell
-            .set_anchor(
-                win,
-                GtkLayerShell.Edge[side.toUpperCase()],
-                true,
-            ),
-        );
+        anchor.trim().split(' ').forEach(side => {
+            try {
+                GtkLayerShell.set_anchor(
+                    win,
+                    GtkLayerShell.Edge[side.toUpperCase()],
+                    true,
+                );
+            } catch (error) {
+                warning('wrong anchor value');
+            }
+        });
     }
 
     if (margin) {
@@ -76,20 +79,20 @@ export default function Window({
             margin = [margin];
 
         switch (margin.length) {
-            case 1:
-                margins = [['TOP', 0], ['RIGHT', 0], ['BOTTOM', 0], ['LEFT', 0]];
-                break;
-            case 2:
-                margins = [['TOP', 0], ['RIGHT', 1], ['BOTTOM', 0], ['LEFT', 1]];
-                break;
-            case 3:
-                margins = [['TOP', 0], ['RIGHT', 1], ['BOTTOM', 2], ['LEFT', 1]];
-                break;
-            case 4:
-                margins = [['TOP', 0], ['RIGHT', 1], ['BOTTOM', 2], ['LEFT', 3]];
-                break;
-            default:
-                break;
+        case 1:
+            margins = [['TOP', 0], ['RIGHT', 0], ['BOTTOM', 0], ['LEFT', 0]];
+            break;
+        case 2:
+            margins = [['TOP', 0], ['RIGHT', 1], ['BOTTOM', 0], ['LEFT', 1]];
+            break;
+        case 3:
+            margins = [['TOP', 0], ['RIGHT', 1], ['BOTTOM', 2], ['LEFT', 1]];
+            break;
+        case 4:
+            margins = [['TOP', 0], ['RIGHT', 1], ['BOTTOM', 2], ['LEFT', 3]];
+            break;
+        default:
+            break;
         }
 
         margins.forEach(([side, i]) =>
@@ -110,9 +113,10 @@ export default function Window({
             : warning(`Coulnd not find monitor with id ${monitor}`);
     }
 
-    if (className) {
+    if (typeof className === 'string') {
         className.split(' ').forEach(cn => {
-            win.add_css_class(cn);
+            if (cn)
+                win.add_css_class(cn);
         });
     }
 
@@ -122,21 +126,13 @@ export default function Window({
     if (child)
         win.set_child(Widget(child));
 
-    if (popup) {
-        win.connect('key-press-event', (_, event) => {
-            if (event.get_keyval()[1] === Gdk.KEY_Escape)
-                App.getWindow(name) ? App.closeWindow(name) : win.hide();
-        });
-
-        visible = false;
-    }
-
     if (focusable)
         GtkLayerShell.set_keyboard_mode(win, GtkLayerShell.KeyboardMode.ON_DEMAND);
 
-    win.present();
-    if (!visible)
-        win.visible = false;
+    if (typeof modal === 'boolean')
+        win.modal = modal;
+
+    visible ? win.present() : win.visible = false;
 
     if (setup)
         setup(win);

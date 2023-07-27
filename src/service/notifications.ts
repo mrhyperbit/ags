@@ -180,13 +180,6 @@ class NotificationsService extends Service {
         );
     }
 
-    _filterName(name: string) {
-        return NOTIFICATIONS_CACHE_PATH +
-            '/' +
-            name.replace(/[\ \,\*\?\"\<\>\|\#\:\?\/\!\']/g, '') +
-            '.png';
-    }
-
     _readFromFile() {
         const file = readFile(NOTIFICATIONS_CACHE_PATH + '/notifications.json');
         if (!file)
@@ -212,7 +205,9 @@ class NotificationsService extends Service {
             return null;
 
         ensureDirectory();
-        const fileName = this._filterName(name);
+        const fileName = NOTIFICATIONS_CACHE_PATH + '/'
+            .replace(/[^a-zA-Z0-9]/g, '') + '.png';
+
         const image = image_data.recursiveUnpack();
         const pixbuf = GdkPixbuf.Pixbuf.new_from_bytes(
             image[6],

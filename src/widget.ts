@@ -15,9 +15,11 @@ interface EventListeners {
     onKeyPressed?: (widget: Gtk.Widget, keyval: number, keycode: number, state: Gdk.ModifierType) => void,
     onKeyReleased?: (widget: Gtk.Widget, keyval: number, keycode: number, state: Gdk.ModifierType) => void,
     onMotion?: (widget: Gtk.Widget, x: number, y: number) => void,
-    onMotionEnter?: (widget: Gtk.Widget, x: number, y: number) => void,
-    onMotionLeave?: (widget: Gtk.Widget) => void,
+    onHoverEnter?: (widget: Gtk.Widget, x: number, y: number) => void,
+    onHoverLeave?: (widget: Gtk.Widget) => void,
     onScroll?: (widget: Gtk.Widget, dx: number, dy: number) => void,
+    onScrollUp?: (widget: Gtk.Widget) => void,
+    onScrollDown?: (widget: Gtk.Widget) => void,
     onButtonPressed?: (widget: Gtk.Widget, button: number) => void,
     onButtonReleased?: (widget: Gtk.Widget, button: number) => void,
 }
@@ -69,54 +71,106 @@ export function toggleClassName(widget: Gtk.Widget, className: string, condition
         : widget.remove_css_class(className);
 }
 
+function handleEvent(callback: (...args: any[]) => void | boolean, ...args: any[]) {
+    const r = callback(...args);
+    if (typeof r === 'boolean')
+        return r;
+
+    return true;
+}
+
 function parseEventListeners(widget: Gtk.Widget, {
     onFocusEnter, onFocusLeave,
     onKeyPressed, onKeyReleased,
-    onMotion, onMotionEnter, onMotionLeave,
-    onScroll,
+    onMotion, onHoverEnter, onHoverLeave,
+    onScroll, onScrollUp, onScrollDown,
     onButtonPressed, onButtonReleased,
 }: EventListeners) {
     if (onFocusLeave || onFocusEnter) {
         const controller = new Gtk.EventControllerFocus();
         widget.add_controller(controller);
 
-        if (onFocusEnter)
-            controller.connect('enter', () => onFocusEnter(widget));
+        if (onFocusEnter) {
+            controller.connect('enter', () =>
+                handleEvent(onFocusEnter, widget),
+            );
+        }
 
-        if (onFocusLeave)
-            controller.connect('leave', () => onFocusLeave(widget));
+        if (onFocusLeave) {
+            controller.connect('leave', () =>
+                handleEvent(onFocusLeave, widget),
+            );
+        }
     }
 
     if (onKeyReleased || onKeyPressed) {
         const controller = new Gtk.EventControllerKey();
         widget.add_controller(controller);
 
-        if (onKeyPressed)
-            controller.connect('key-pressed', (_s, val, code, state) => onKeyPressed(widget, val, code, state));
+        if (onKeyPressed) {
+            controller.connect('key-pressed', (_s, val, code, state) =>
+                handleEvent(onKeyPressed, widget, val, code, state),
+            );
+        }
 
-        if (onKeyReleased)
-            controller.connect('key-released', (_s, val, code, state) => onKeyReleased(widget, val, code, state));
+        if (onKeyReleased) {
+            controller.connect('key-released', (_s, val, code, state) =>
+                handleEvent(onKeyReleased, widget, val, code, state),
+            );
+        }
     }
 
-    if (onMotion || onMotionLeave || onMotionEnter) {
+    if (onMotion || onHoverLeave || onHoverEnter) {
         const controller = new Gtk.EventControllerMotion();
         widget.add_controller(controller);
 
-        if (onMotion)
-            controller.connect('motion', (_s, x, y) => onMotion(widget, x, y));
+        if (onMotion) {
+            controller.connect('motion', (_s, x, y) =>
+                handleEvent(onMotion, widget, x, y),
+            );
+        }
 
-        if (onMotionLeave)
-            controller.connect('leave', () => onMotionLeave(widget));
+        if (onHoverLeave) {
+            controller.connect('leave', () =>
+                handleEvent(onHoverLeave, widget),
+            );
+        }
 
-        if (onMotionEnter)
-            controller.connect('enter', (_s, x, y) => onMotionEnter(widget, x, y));
+        if (onHoverEnter) {
+            controller.connect('enter', (_s, x, y) =>
+                handleEvent(onHoverEnter, widget, x, y),
+            );
+        }
     }
 
-    if (onScroll) {
+    if (onScroll || onScrollUp || onScrollDown) {
         const controller = new Gtk.EventControllerScroll();
         widget.add_controller(controller);
         controller.set_flags(Gtk.EventControllerScrollFlags.BOTH_AXES);
-        controller.connect('scroll', (_s, dx, dy) => onScroll(widget, dx, dy));
+
+        if (onScroll) {
+            controller.connect('scroll', (_s, dx, dy) =>
+                handleEvent(onScroll, widget, dx, dy),
+            );
+        }
+
+        if (onScrollUp) {
+            controller.connect('scroll', (_s, dx, dy) => {
+                if (dy < 0 || dx < 0)
+                    return handleEvent(onScrollUp, widget, dx, dy);
+
+                return false;
+            });
+        }
+
+        if (onScrollDown) {
+            controller.connect('scroll', (_s, dx, dy) => {
+                if (dy > 0 || dx > 0)
+                    return handleEvent(onScrollDown, widget, dx, dy);
+
+                return false;
+            });
+        }
     }
 
     if (onButtonPressed || onButtonReleased) {
@@ -126,14 +180,18 @@ function parseEventListeners(widget: Gtk.Widget, {
         if (onButtonPressed) {
             controller.connect('event', (_s, e) => {
                 if (e.get_event_type() === Gdk.EventType.BUTTON_PRESS)
-                    onButtonPressed(widget, (e as Gdk.ButtonEvent).get_button());
+                    return handleEvent(onButtonPressed, widget, (e as Gdk.ButtonEvent).get_button());
+
+                return false;
             });
         }
 
         if (onButtonReleased) {
             controller.connect('event', (_s, e) => {
                 if (e.get_event_type() === Gdk.EventType.BUTTON_RELEASE)
-                    onButtonReleased(widget, (e as Gdk.ButtonEvent).get_button());
+                    return handleEvent(onButtonReleased, widget, (e as Gdk.ButtonEvent).get_button());
+
+                return false;
             });
         }
     }
@@ -162,7 +220,8 @@ function parseParams(widget: Gtk.Widget, {
 
     if (typeof className === 'string') {
         className.split(' ').forEach(cn => {
-            widget.add_css_class(cn);
+            if (cn)
+                widget.add_css_class(cn);
         });
     }
 
@@ -246,9 +305,9 @@ export default function Widget(params: Widget | string | (() => Gtk.Widget) | Gt
         hexpand, vexpand, sensitive, tooltip, visible, setup,
         onFocusEnter, onFocusLeave,
         onKeyPressed, onKeyReleased,
-        onMotion, onMotionEnter, onMotionLeave,
+        onMotion, onHoverEnter, onHoverLeave,
         onButtonPressed, onButtonReleased,
-        onScroll,
+        onScroll, onScrollDown, onScrollUp,
         ...props
     }: Widget = params;
 
@@ -272,9 +331,9 @@ export default function Widget(params: Widget | string | (() => Gtk.Widget) | Gt
     parseEventListeners(widget, {
         onFocusEnter, onFocusLeave,
         onKeyPressed, onKeyReleased,
-        onMotion, onMotionEnter, onMotionLeave,
+        onMotion, onHoverEnter, onHoverLeave,
         onButtonPressed, onButtonReleased,
-        onScroll,
+        onScroll, onScrollDown, onScrollUp,
     });
 
     return widget;

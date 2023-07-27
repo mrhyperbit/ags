@@ -48,6 +48,7 @@ class Wifi extends Service {
                 ['notify::active-access-point', this._activeAp.bind(this)],
                 ['access-point-added', () => this.emit('changed')],
                 ['access-point-removed', () => this.emit('changed')],
+                ['notify::state', () => this.emit('changed')],
             ]);
             this._activeAp();
         }
