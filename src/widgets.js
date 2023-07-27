@@ -191,7 +191,7 @@ export function Stack({ type,
     transition = 'none',
     transitionDuration = 200,
     ...rest
-} = {}) {
+}) {
     typecheck('hhomogeneous', hhomogeneous, 'boolean', type);
     typecheck('vhomogeneous', vhomogeneous, 'boolean', type);
     typecheck('interpolateSize', interpolateSize, 'boolean', type);
@@ -357,22 +357,34 @@ export function Overlay({ type,
     return overlay;
 }
 
-export function ProgressBar({ type,
-    fraction = 0,
+export function LevelBar({ type,
+    value = 0,
+    maxValue = 1,
+    minValue = 0,
     inverted = false,
     orientation = 'horizontal',
+    mode = 'continuous',
     ...rest
 }) {
-    typecheck('fraction', fraction, 'number', type);
+    typecheck('value', value, 'number', type);
+    typecheck('maxValue', maxValue, 'number', type);
+    typecheck('minValue', minValue, 'number', type);
     typecheck('inverted', inverted, 'boolean', type);
     typecheck('orientation', orientation, 'string', type);
+    typecheck('mode', mode, 'string', type);
     restcheck(rest, type);
 
-    const bar = new Gtk.ProgressBar({
+    const bar = new Gtk.LevelBar({
         orientation: _orientation(orientation),
         inverted,
-        fraction,
+        value, minValue, maxValue,
     });
+
+    try {
+        bar.set_mode(Gtk.LevelBarMode[mode.toUpperCase()]);
+    } catch (error) {
+        warning('wrong levelbar mode value');
+    }
 
     return bar;
 }
@@ -396,4 +408,50 @@ export function Switch({ type,
     }
 
     return gtkswitch;
+}
+
+export function Popover({ type,
+    child,
+    autohide = true,
+    hasArrow = false,
+    ...rest
+}) {
+    typecheck('autohide', autohide, 'boolean', type);
+    typecheck('hasArrow', hasArrow, 'boolean', type);
+    restcheck(rest, type);
+
+    const popover = new Gtk.Popover({
+        autohide,
+        hasArrow,
+    });
+
+    if (child)
+        popover.set_child(Widget(child));
+
+    return popover;
+}
+
+export function MenuButton({ type,
+    child,
+    popover,
+    onActivate,
+    ...rest
+}) {
+    restcheck(rest, type);
+
+    const button = new Gtk.MenuButton({
+        alwaysShowArrow: false,
+    });
+
+    if (onActivate)
+        button.connect('notify::active', () => runCmd(onActivate, button));
+
+
+    if (popover)
+        button.set_popover(Widget(popover));
+
+    if (child)
+        button.set_child(Widget(child));
+
+    return button;
 }

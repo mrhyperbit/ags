@@ -50,12 +50,14 @@ const widgets: { [key: string]: (props: any) => Gtk.Widget } = {
     'icon': Basic.Icon,
     'label': Basic.Label,
     'overlay': Basic.Overlay,
-    'progressbar': Basic.ProgressBar,
+    'levelbar': Basic.LevelBar,
     'revealer': Basic.Revealer,
     'scrollable': Basic.Scrollable,
     'slider': Basic.Slider,
     'stack': Basic.Stack,
     'switch': Basic.Switch,
+    'menubutton': Basic.MenuButton,
+    'popover': Basic.Popover,
 };
 
 export function setStyle(widget: Gtk.Widget, css: string) {
@@ -199,7 +201,7 @@ function parseEventListeners(widget: Gtk.Widget, {
 
 function parseParams(widget: Gtk.Widget, {
     type, className, style, sensitive, tooltip, connections, properties, setup,
-    halign, valign, hexpand, vexpand, visible = true,
+    halign, valign, hexpand, vexpand, visible,
 }: WidgetProps) {
     type = type.toString();
     typecheck('className', className, ['string', 'undefined'], type);
@@ -210,7 +212,7 @@ function parseParams(widget: Gtk.Widget, {
     typecheck('valign', valign, ['string', 'undefined'], type);
     typecheck('hexpand', hexpand, ['boolean', 'undefined'], type);
     typecheck('vexpand', vexpand, ['boolean', 'undefined'], type);
-    typecheck('visible', visible, 'boolean', type);
+    typecheck('visible', visible, ['boolean', 'undefined'], type);
 
     // @ts-ignore
     widget.setStyle = (css: string) => setStyle(widget, css);

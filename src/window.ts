@@ -19,7 +19,7 @@ export interface Window {
     style?: string
     visible?: boolean
     setup?: (win: Gtk.Window) => void,
-    modal?: boolean,
+    dialog?: boolean,
 }
 
 export default function Window({
@@ -34,7 +34,7 @@ export default function Window({
     style = '',
     monitor,
     visible = true,
-    modal = false,
+    dialog = false,
     setup,
     ...rest
 }: Window): Gtk.Window {
@@ -48,7 +48,10 @@ export default function Window({
     typecheck('monitor', monitor, ['number', 'undefined'], 'window');
     restcheck(rest, `window: ${name}`);
 
-    const win = new Gtk.Window({ name });
+    const win = dialog
+        ? new Gtk.Dialog({ name })
+        : new Gtk.Window({ name });
+
     win.set_default_size(1, 1);
     GtkLayerShell.init_for_window(win);
     GtkLayerShell.set_namespace(win, name);
@@ -128,9 +131,6 @@ export default function Window({
 
     if (focusable)
         GtkLayerShell.set_keyboard_mode(win, GtkLayerShell.KeyboardMode.ON_DEMAND);
-
-    if (typeof modal === 'boolean')
-        win.modal = modal;
 
     visible ? win.present() : win.visible = false;
 
